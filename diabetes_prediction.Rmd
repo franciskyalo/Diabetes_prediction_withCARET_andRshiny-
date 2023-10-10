@@ -1,0 +1,449 @@
+---
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **DIABETES PREDICTION USING MACHINE LEARNING**
+
+## BUSINESS UNDERSTANDING 
+
+### Problem statement 
+
+Diabetes is a chronic health condition that affects millions of individuals worldwide, posing significant challenges to their well-being and straining healthcare systems. Early diagnosis and proactive management are essential to mitigate the adverse effects of diabetes and improve patients' quality of life. Furthermore, healthcare providers and systems need efficient tools to allocate resources effectively and provide timely interventions for individuals at risk of diabetes. Failure to address diabetes prediction and prevention can lead to increased healthcare costs, reduced patient outcomes, and a burden on healthcare infrastructure, akin to the plight of Blockbuster in the face of changing market dynamics.
+
+> To address these issues, there is a compelling need for the development of a robust and accurate diabetes prediction system. Such a system would leverage patient data, including medical history, lifestyle factors, and genetic markers, to forecast the likelihood of an individual developing diabetes in the near future. By identifying high-risk individuals and providing targeted interventions, healthcare providers can offer personalized care, improve patient outcomes, and reduce the overall societal burden of diabetes.
+
+This project aims to create an advanced predictive model for diabetes risk assessment, incorporating cutting-edge machine learning techniques and a diverse range of patient data sources. By doing so, we seek to empower healthcare professionals with a powerful tool that can help prevent and manage diabetes more effectively, ultimately reducing the prevalence of this chronic disease and its associated complications. Just as Blockbuster's failure to adapt to evolving market conditions led to its downfall, neglecting the importance of diabetes prediction and prevention could lead to detrimental consequences in healthcare, including increased costs and diminished patient well-being.
+
+
+### Main objective 
+
+The main objective of the project is to come up with a predictive model that is able to identify with high precision a patient who is likely to at risk of developing diabetes 
+
+
+### Metric for success 
+
+The project will be considered a success if the prediction model developed has an accuracy of above **90%** and a recall of above **80%**.
+
+
+## DATA UNDERSTANDING 
+
+This dataset contains `768` data points  and `9` columns. Columns contain different information on subjects such as the  number of pregnancies, glucose level, blood pressure, skin thickness, insulin, Body Mass Index, diabetes pedigree , age and the outcome which is the target variable.
+
+
+```{r, message=FALSE, warning=FALSE}
+# Loading all the required libraries 
+
+library(tidyverse)
+library(caret)
+library(MLmetrics)
+library(dlookr)
+library(ROSE)
+library(corrplot)
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+# Reading in the data and checking the first few rows 
+
+df = read_csv("diabetes.csv")
+
+df %>% head()
+```
+
+```{r}
+# checking the last few rows of the dataset 
+
+df %>% tail()
+```
+
+
+
+
+```{r}
+# checking the columns, rows and records of the dataset 
+
+glimpse(df)
+```
+
+## DATA CLEANING 
+
+* Checking and Dealing with missing values
+
+* Checking for and Dealing with duplicated values
+
+* Checking if dataset has appropriate(expected) data types for each of the columns
+
+* Checking dealing with outliers
+
+
+#### Checking and dealing with missing values 
+
+```{r}
+# checking for percentage missing values 
+
+df %>% diagnose() %>% select(variables, missing_count, missing_percent)
+```
+
+
+For the dataset, it looks like there are no missing values 
+
+
+#### Checking for duplicated values 
+
+```{r}
+# checking for duplicated values 
+
+df %>% duplicated() %>% sum()
+```
+
+
+The dataset does not have any duplicated values.
+
+
+#### Checking if dataset has the expected data types 
+
+
+```{r}
+# checking data types 
+
+df %>% diagnose() %>%  select(variables, types)
+```
+
+
+All expect the `Outcome` variable has the expected data types. The outcome variable should be converted to a factor with `1` representing presence of diabetes and `0` representing no diabetes. 
+
+
+```{r}
+# changing the data type of the outcome variable
+
+df <- df %>%  mutate(Outcome = as_factor(Outcome))
+```
+
+
+
+#### Checking for outliers 
+
+
+```{r}
+# checking for outliers 
+
+df %>% diagnose_outlier()
+```
+
+
+Although there is evidence of outliers, the algorithm used `randomforest model` deals with outliers as aggregates predictions from many decision trees therefore removing any potential biases that would arise from outliers  
+
+```{r}
+df %>% summary()
+```
+
+
+## EXPLORATORY DATA ANALYSIS 
+
+
+### UNIVARIATE ANALYSIS 
+
+```{r}
+ggplot(df, aes(Glucose))+
+  geom_histogram(binwidth = 20, fill="lightsalmon") +
+  labs(title = "Distribution of Glucose", 
+       subtitle = "The histogram shows evidence of a normal distribution") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(df, aes(Pregnancies))+
+  geom_histogram(binwidth = 1, fill="darkkhaki") +
+  labs(title = "Distribution of Pregnancies", 
+       subtitle = "The histogram shows evidence of a positive skewness") +
+  theme_minimal()
+```
+
+
+
+```{r}
+ggplot(df, aes(BloodPressure))+
+  geom_histogram(binwidth = 5, fill="plum") +
+  labs(title = "Distribution of BloodPressure", 
+       subtitle = "The histogram shows evidence of a normal distribution") +
+  theme_minimal()
+```
+
+
+```{r}
+ggplot(df, aes(SkinThickness))+
+  geom_histogram(binwidth = 5, fill="palegreen") +
+  labs(title = "Distribution of Skinthickness",
+       subtitle = "The histogram shows evidence of a normal distribution") +
+  theme_minimal()
+```
+
+
+```{r}
+ggplot(df, aes(Insulin))+
+  geom_histogram(binwidth = 50, fill="lightseagreen")+
+  labs(title = "Distribution of Glucose", 
+       subtitle = "The histogram shows evidence of positive skewness") +
+  theme_minimal()
+```
+
+
+
+```{r}
+ggplot(df, aes(BMI))+
+  geom_histogram(binwidth = 5,fill="chocolate") +
+  labs(title = "Distribution of BMI",
+       subtitle = "The histogram shows evidence of a normal distribution") +
+  theme_minimal()
+```
+
+
+```{r}
+ggplot(df, aes(DiabetesPedigreeFunction))+
+  geom_histogram(binwidth = 0.25,fill="goldenrod") +
+  labs(title = "Distribution of DiabetesPedigreeFunction",
+       subtitle = "The histogram shows evidence positive skewness") +
+  theme_minimal()
+```
+
+
+
+```{r}
+ggplot(df, aes(Age))+
+  geom_histogram(binwidth =5, fill="aquamarine") +
+  labs(title = "Distribution of age", 
+       subtitle = "The histogram shows evidence of positive skewness") +
+  theme_minimal()
+```
+
+
+```{r}
+pie_data <- df %>% group_by(Outcome) %>%
+summarise(count = n()) %>% 
+mutate(perc = round((count/sum(count)) * 100),digits=2)
+
+
+
+ggplot(pie_data, aes(x="", y=perc, fill=Outcome)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) +
+  geom_text(aes(label = paste0(perc, "%")),
+  position = position_stack(vjust=0.5)) +
+  labs(x = NULL, y = NULL, fill = NULL,
+  title = "Percentage Distribution Outcome", 
+  subtitle = "35% tested positive for diabetes while 65% tested negative") +
+  theme_classic() +
+  theme(axis.line = element_blank(),
+  axis.text = element_blank(),
+  axis.ticks = element_blank()) +
+  scale_fill_brewer(palette = "Accent")
+```
+
+
+
+From the pie chart,there is evidence of class imbalance for the outcome variable. This poses a unique challenge for the model as it will not have enough samples from the minority class(which in this case is people diagnosed with diabetes) to train on and may struggle to predict correctly this class compared to the majority class.
+
+
+### BIVARIATE ANALYSIS 
+
+Correlations help you understand the relationships between different variables in your dataset. A high positive correlation between two variables indicates that they tend to increase or decrease together, while a high negative correlation indicates that one variable tends to increase as the other decreases.
+
+```{r}
+correlations <- df %>% select(-Outcome) %>% cor()
+
+corrplot(correlations, method = 'number')
+```
+
+
+Suprisingly, there are no very strong correlations between the variables except for Pregnancies and Age which had some sort of strong correlations as it would be expected that someone will have to live longer to give birth to many chidren.
+
+
+```{r}
+ggplot(df, aes(BMI, Glucose, color=Outcome))+
+  geom_point()+
+  labs(title = "Glucose vs BMI" , 
+       subtitle = "From the plot it is evident that people with high levels of\nGlucose and BMI are more likely to test positive for diabetes" ) +
+  theme_minimal()
+```
+
+
+```{r}
+ggplot(df, aes(BMI, BloodPressure, color=Outcome))+
+  geom_point()+
+  labs(title = "Glucose vs BMI" , 
+       subtitle = "From the plot it is evident that people with high levels of\nBloodpressure and BMI are also more likely to test positive for diabetes" ) +
+  theme_minimal()
+```
+
+
+
+```{r}
+ggplot(df, aes(Glucose, DiabetesPedigreeFunction, color=Outcome))+
+  geom_point()+
+  labs(title = "Glucose vs BMI" , 
+       subtitle = "From the plot it is evident that people with high levels of\nGlucose and DiabetesPedigreefunction are also more likely to test positive for diabetes" ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot(df, aes(Insulin, SkinThickness, color=Outcome))+
+  geom_point()+
+  labs(title = "Insulin vs SkinThickness",
+       subtitle = "From the plot there is not too much to conclude although it would appear as though people with high insulin levels tend to have high levels of skin thickness especially for people diagnosed with diabetes" ) +
+  theme_minimal()
+```
+
+
+### MODELLING
+
+
+```{r}
+# we need to drop all values where the value is zero and skin thickness
+
+df <- df %>% 
+    filter_if(is.numeric, all_vars((.) != 0)) 
+
+```
+
+
+
+```{r}
+# splitting data into training testing set
+
+set.seed(123)
+split <- createDataPartition(df$Outcome, p = .8,
+                                  list = FALSE)
+
+trainset <- df[split,]
+
+testset <- df[-split,]
+```
+
+
+
+
+```{r}
+# preprocessing
+
+set.seed(123)
+
+outcome_train <- trainset %>% pull(Outcome)
+
+outcome_test <- testset %>% pull(Outcome)
+
+predictors_train <- trainset %>% select(-Outcome)
+
+predictors_test <- testset %>% select(-Outcome)
+
+preproc <- preProcess(predictors_train, method = c("center", "scale"))
+
+train_preproc <- predict(preproc, predictors_train)
+
+test_preproc <- predict(preproc, predictors_test)
+
+train_preproc_df <- train_preproc %>% mutate(Outcome=outcome_train)
+
+test_preproc_df <- test_preproc %>% mutate(Outcome = outcome_test)
+
+```
+
+
+```{r}
+# over-sampling the minority class to enable the model predict better
+
+over_preproctrain_df <- ovun.sample(Outcome ~ .,data=train_preproc_df,N=360)$data
+```
+
+
+
+
+```{r}
+# training the model
+
+# train control of the model
+ctrl <- trainControl(
+  method = "repeatedcv",
+  repeats = 5)
+
+
+# fitting a random forest model using the balanced dataset
+
+randomforest_model <- train(
+  Outcome ~ .,
+  data = over_preproctrain_df,
+  method = "rf",
+  trControl = ctrl,
+  tuneLength= 5)
+```
+
+
+
+```{r}
+
+# checking the overall performance of the model on training set
+
+randomforest_model
+```
+
+
+```{r}
+# checking accuracy and precall of the model using confusion matrix on test set
+
+y_pred_rf = predict(randomforest_model, newdata = test_preproc_df)
+
+confusionMatrix(test_preproc_df$Outcome, y_pred_rf)
+```
+
+For the random forest model, the model has a `overall accuracy of around 79%` and a recall of `84%`
+
+
+```{r}
+# fitting a support vector machine model
+
+svm_model <- train(
+  Outcome ~ .,
+  data = over_preproctrain_df,
+  method = "svmRadial",
+  trControl = ctrl,
+  tuneLength= 5)
+```
+
+
+
+```{r}
+# checking the performance of the model on the training set
+
+svm_model
+```
+
+```{r}
+# checking accuracy and precall of the model using confusion matrix on test set
+
+y_pred_svm = predict(svm_model, newdata = test_preproc_df)
+
+confusionMatrix(test_preproc_df$Outcome, y_pred_svm)
+```
+
+
+
+The support vector machine model performs poorly on the test set compared to the random forest with an accuracy of `65%` and a recall of `75%`
+
+
+In this case the `xgboost model` will be saved to be deployed an shiny app with an interactive user interface.
+
+
+
+### SAVING THE MODEL AS A RDS OBJECT FOR USE IN SHINY APP
+
+
+```{r}
+# saving the model as a RDS object
+
+write_rds(randomforest_model, "randomforest_model.rds")
+```
+
+
