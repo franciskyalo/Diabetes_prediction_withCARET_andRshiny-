@@ -63,6 +63,7 @@ library(tidyverse)
 library(caret)
 library(MLmetrics)
 library(dlookr)
+library(ROSE)
 library(corrplot)
 ```
 
@@ -248,11 +249,6 @@ df %>% summary()
     ##         
     ## 
 
-``` r
-some_df <- df %>% filter(Glucose == 0 | BloodPressure ==0 | 
-                SkinThickness ==0 | Insulin == 0 | BMI==0)
-```
-
 ## EXPLORATORY DATA ANALYSIS
 
 ### UNIVARIATE ANALYSIS
@@ -265,7 +261,7 @@ ggplot(df, aes(Glucose))+
   theme_minimal()
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
 ``` r
 ggplot(df, aes(Pregnancies))+
@@ -275,7 +271,7 @@ ggplot(df, aes(Pregnancies))+
   theme_minimal()
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
 
 ``` r
 ggplot(df, aes(BloodPressure))+
@@ -285,7 +281,7 @@ ggplot(df, aes(BloodPressure))+
   theme_minimal()
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 ``` r
 ggplot(df, aes(SkinThickness))+
@@ -295,7 +291,7 @@ ggplot(df, aes(SkinThickness))+
   theme_minimal()
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
 ``` r
 ggplot(df, aes(Insulin))+
@@ -305,7 +301,7 @@ ggplot(df, aes(Insulin))+
   theme_minimal()
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 ``` r
 ggplot(df, aes(BMI))+
@@ -315,7 +311,7 @@ ggplot(df, aes(BMI))+
   theme_minimal()
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 ``` r
 ggplot(df, aes(DiabetesPedigreeFunction))+
@@ -325,7 +321,7 @@ ggplot(df, aes(DiabetesPedigreeFunction))+
   theme_minimal()
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
 ``` r
 ggplot(df, aes(Age))+
@@ -335,7 +331,7 @@ ggplot(df, aes(Age))+
   theme_minimal()
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
 ``` r
 pie_data <- df %>% group_by(Outcome) %>%
@@ -359,7 +355,13 @@ ggplot(pie_data, aes(x="", y=perc, fill=Outcome)) +
   scale_fill_brewer(palette = "Accent")
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+
+From the pie chart,there is evidence of class imbalance for the outcome
+variable. This poses a unique challenge for the model as it will not
+have enough samples from the minority class(which in this case is people
+diagnosed with diabetes) to train on and may struggle to predict
+correctly this class compared to the majority class.
 
 ### BIVARIATE ANALYSIS
 
@@ -375,7 +377,7 @@ correlations <- df %>% select(-Outcome) %>% cor()
 corrplot(correlations, method = 'number')
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
 Suprisingly, there are no very strong correlations between the variables
 except for Pregnancies and Age which had some sort of strong
@@ -390,7 +392,7 @@ ggplot(df, aes(BMI, Glucose, color=Outcome))+
   theme_minimal()
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
 ``` r
 ggplot(df, aes(BMI, BloodPressure, color=Outcome))+
@@ -400,7 +402,7 @@ ggplot(df, aes(BMI, BloodPressure, color=Outcome))+
   theme_minimal()
 ```
 
-![](diabetes_prediction_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
 ``` r
 ggplot(df, aes(Glucose, DiabetesPedigreeFunction, color=Outcome))+
@@ -410,4 +412,240 @@ ggplot(df, aes(Glucose, DiabetesPedigreeFunction, color=Outcome))+
   theme_minimal()
 ```
 
+![](diabetes_prediction_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+
+``` r
+ggplot(df, aes(Insulin, SkinThickness, color=Outcome))+
+  geom_point()+
+  labs(title = "Insulin vs SkinThickness",
+       subtitle = "From the plot there is not too much to conclude although it would appear as though people with high insulin levels tend to have high levels of skin thickness especially for people diagnosed with diabetes" ) +
+  theme_minimal()
+```
+
 ![](diabetes_prediction_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
+
+### MODELLING
+
+``` r
+# we need to drop all values where the value is zero and skin thickness
+
+df <- df %>% 
+    filter_if(is.numeric, all_vars((.) != 0)) 
+```
+
+``` r
+# splitting data into training testing set
+
+set.seed(123)
+split <- createDataPartition(df$Outcome, p = .8,
+                                  list = FALSE)
+
+trainset <- df[split,]
+
+testset <- df[-split,]
+```
+
+``` r
+# preprocessing
+
+set.seed(123)
+
+outcome_train <- trainset %>% pull(Outcome)
+
+outcome_test <- testset %>% pull(Outcome)
+
+predictors_train <- trainset %>% select(-Outcome)
+
+predictors_test <- testset %>% select(-Outcome)
+
+preproc <- preProcess(predictors_train, method = c("center", "scale"))
+
+train_preproc <- predict(preproc, predictors_train)
+
+test_preproc <- predict(preproc, predictors_test)
+
+train_preproc_df <- train_preproc %>% mutate(Outcome=outcome_train)
+
+test_preproc_df <- test_preproc %>% mutate(Outcome = outcome_test)
+```
+
+``` r
+# over-sampling the minority class to enable the model predict better
+
+over_preproctrain_df <- ovun.sample(Outcome ~ .,data=train_preproc_df,N=360)$data
+```
+
+``` r
+# training the model
+
+# train control of the model
+ctrl <- trainControl(
+  method = "repeatedcv",
+  repeats = 5)
+
+
+# fitting a random forest model using the balanced dataset
+
+randomforest_model <- train(
+  Outcome ~ .,
+  data = over_preproctrain_df,
+  method = "rf",
+  trControl = ctrl,
+  tuneLength= 5)
+```
+
+``` r
+# checking the overall performance of the model on training set
+
+randomforest_model
+```
+
+    ## Random Forest 
+    ## 
+    ## 360 samples
+    ##   8 predictor
+    ##   2 classes: '0', '1' 
+    ## 
+    ## No pre-processing
+    ## Resampling: Cross-Validated (10 fold, repeated 5 times) 
+    ## Summary of sample sizes: 324, 324, 324, 323, 323, 324, ... 
+    ## Resampling results across tuning parameters:
+    ## 
+    ##   mtry  Accuracy   Kappa    
+    ##   2     0.9404363  0.8806297
+    ##   3     0.9448666  0.8894989
+    ##   5     0.9416118  0.8829573
+    ##   6     0.9421523  0.8840617
+    ##   8     0.9377353  0.8752726
+    ## 
+    ## Accuracy was used to select the optimal model using the largest value.
+    ## The final value used for the model was mtry = 3.
+
+``` r
+# checking accuracy and precall of the model using confusion matrix on test set
+
+y_pred_rf = predict(randomforest_model, newdata = test_preproc_df)
+
+confusionMatrix(test_preproc_df$Outcome, y_pred_rf)
+```
+
+    ## Confusion Matrix and Statistics
+    ## 
+    ##           Reference
+    ## Prediction  0  1
+    ##          0 33 12
+    ##          1  6 16
+    ##                                          
+    ##                Accuracy : 0.7313         
+    ##                  95% CI : (0.609, 0.8324)
+    ##     No Information Rate : 0.5821         
+    ##     P-Value [Acc > NIR] : 0.008183       
+    ##                                          
+    ##                   Kappa : 0.4306         
+    ##                                          
+    ##  Mcnemar's Test P-Value : 0.238593       
+    ##                                          
+    ##             Sensitivity : 0.8462         
+    ##             Specificity : 0.5714         
+    ##          Pos Pred Value : 0.7333         
+    ##          Neg Pred Value : 0.7273         
+    ##              Prevalence : 0.5821         
+    ##          Detection Rate : 0.4925         
+    ##    Detection Prevalence : 0.6716         
+    ##       Balanced Accuracy : 0.7088         
+    ##                                          
+    ##        'Positive' Class : 0              
+    ## 
+
+For the random forest model, the model has a
+`overall accuracy of around 79%` and a recall of `84%`
+
+``` r
+# fitting a support vector machine model
+
+svm_model <- train(
+  Outcome ~ .,
+  data = over_preproctrain_df,
+  method = "svmRadial",
+  trControl = ctrl,
+  tuneLength= 5)
+```
+
+``` r
+# checking the performance of the model on the training set
+
+svm_model
+```
+
+    ## Support Vector Machines with Radial Basis Function Kernel 
+    ## 
+    ## 360 samples
+    ##   8 predictor
+    ##   2 classes: '0', '1' 
+    ## 
+    ## No pre-processing
+    ## Resampling: Cross-Validated (10 fold, repeated 5 times) 
+    ## Summary of sample sizes: 323, 324, 325, 324, 324, 324, ... 
+    ## Resampling results across tuning parameters:
+    ## 
+    ##   C     Accuracy   Kappa    
+    ##   0.25  0.8366667  0.6719781
+    ##   0.50  0.8456173  0.6897676
+    ##   1.00  0.8540150  0.7070744
+    ##   2.00  0.8580124  0.7153437
+    ##   4.00  0.8685431  0.7363528
+    ## 
+    ## Tuning parameter 'sigma' was held constant at a value of 0.1252854
+    ## Accuracy was used to select the optimal model using the largest value.
+    ## The final values used for the model were sigma = 0.1252854 and C = 4.
+
+``` r
+# checking accuracy and precall of the model using confusion matrix on test set
+
+y_pred_svm = predict(svm_model, newdata = test_preproc_df)
+
+confusionMatrix(test_preproc_df$Outcome, y_pred_svm)
+```
+
+    ## Confusion Matrix and Statistics
+    ## 
+    ##           Reference
+    ## Prediction  0  1
+    ##          0 34 11
+    ##          1  7 15
+    ##                                          
+    ##                Accuracy : 0.7313         
+    ##                  95% CI : (0.609, 0.8324)
+    ##     No Information Rate : 0.6119         
+    ##     P-Value [Acc > NIR] : 0.02793        
+    ##                                          
+    ##                   Kappa : 0.418          
+    ##                                          
+    ##  Mcnemar's Test P-Value : 0.47950        
+    ##                                          
+    ##             Sensitivity : 0.8293         
+    ##             Specificity : 0.5769         
+    ##          Pos Pred Value : 0.7556         
+    ##          Neg Pred Value : 0.6818         
+    ##              Prevalence : 0.6119         
+    ##          Detection Rate : 0.5075         
+    ##    Detection Prevalence : 0.6716         
+    ##       Balanced Accuracy : 0.7031         
+    ##                                          
+    ##        'Positive' Class : 0              
+    ## 
+
+The support vector machine model performs poorly on the test set
+compared to the random forest with an accuracy of `65%` and a recall of
+`75%`
+
+In this case the `xgboost model` will be saved to be deployed an shiny
+app with an interactive user interface.
+
+### SAVING THE MODEL AS A RDS OBJECT FOR USE IN SHINY APP
+
+``` r
+# saving the model as a RDS object
+
+write_rds(randomforest_model, "randomforest_model.rds")
+```
